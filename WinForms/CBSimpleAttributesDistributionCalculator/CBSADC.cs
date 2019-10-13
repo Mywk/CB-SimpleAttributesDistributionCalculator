@@ -104,7 +104,7 @@ namespace CBSimpleAttributesDistributionCalculator
         ///  Aid method used below, this either returns the Max or Min value from the array of given NumericUpDown controls
         ///  Note: Currently unused
         /// </summary>
-        /// <param name="ascending"></param>
+        /// <param name="min">Ascending or Descending</param>
         /// <param name="ignore">Ignored NumericUpDown</param>
         /// <param name="items"></param>
         /// <returns></returns>

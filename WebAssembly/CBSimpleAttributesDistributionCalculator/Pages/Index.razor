@@ -1,0 +1,303 @@
+﻿@page "/"
+
+    <head>
+        <style>
+            .numericUpDown {
+                color: @NumericUpDownColor; text-align: right; width: 50px;
+            }
+        </style>
+    </head>
+
+<RadzenCard Style="margin-top: 20px;">
+    <div>
+        <table>
+            <tbody>
+                <tr>
+                    <td>&nbsp;</td>
+                    <td style="text-align: center; font-weight: bold;">&#37;</td>
+                    <td>&nbsp;</td>
+                </tr>
+                <tr>
+                    <td style="width: 120px;">Strength</td>
+                    <td style="color:=@InfoLabelBackground;">
+                        <RadzenNumeric TValue="int?" Change="@(args => NumericUpDownChanged(args, "Strength"))" Value="@(Player.GetAttribute("Strength").Pct)" Min="0" Max="100" />
+                    </td>
+                    <td class="numericUpDown">@Player.GetAttribute("Strength").ValueLabel</td>
+                </tr>
+                <tr>
+                    <td>Agility</td>
+                    <td>
+                        <RadzenNumeric TValue="int?" Change="@(args => NumericUpDownChanged(args, "Agility"))" Value="@(Player.GetAttribute("Agility").Pct)" Min="0" Max="100" />
+                    </td>
+                    <td class="numericUpDown">@Player.GetAttribute("Agility").ValueLabel</td>
+                </tr>
+                <tr>
+                    <td>Armour</td>
+                    <td>
+                        <RadzenNumeric TValue="int?" Change="@(args => NumericUpDownChanged(args, "Armour"))" Value="@(Player.GetAttribute("Armour").Pct)" Min="0" Max="100" />
+                    </td>
+                    <td class="numericUpDown">@Player.GetAttribute("Armour").ValueLabel</td>
+                </tr>
+                <tr>
+                    <td>Thoughness</td>
+                    <td>
+                        <RadzenNumeric TValue="int?" Change="@(args => NumericUpDownChanged(args, "Thoughness"))" Value="@(Player.GetAttribute("Thoughness").Pct)" Min="0" Max="100" />
+                    </td>
+                    <td class="numericUpDown">@Player.GetAttribute("Thoughness").ValueLabel</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <br />
+
+    <div>
+        <table>
+            <tbody>
+                <tr>
+                    <td>
+                        <p style="color: @InfoLabelBackground; margin-right: 20px;">@InfoLabel</p>
+                    </td>
+                    <td>
+                        <RadzenButton Click="@((args) => AutoAdjustButton())" Text="Auto Adjust" Style="margin-bottom: 15px; width: 150px; margin-top: 15px;" Visible="ShowAutoAdjustButton" />
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <br />
+        <table>
+            <tbody>
+                <tr>
+                    <td style="width: 120px;">Points Progress</td>
+                    <td>
+                        <RadzenNumeric TValue="int?" Change="@(args => PointsProgressChanged(args))" Value="Player.PointsProgress" Min="PointsProgressMin" Max="PointsProgressMax" />
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <br />
+
+
+</RadzenCard>
+
+@code {
+
+    bool ShowAutoAdjustButton { get; set; } = false;
+
+    string InfoLabelBackground { get; set; } = "red";
+
+    string NumericUpDownColor { get; set; } = "darkgreen";
+
+    class PlayerAttribute
+    {
+        public string Name = "";
+        public int Pct { get; set; } = 25;
+        public int ValueLabel { get; set; } = 17;
+
+        public PlayerAttribute(string name)
+        {
+            Name = name;
+        }
+    }
+
+    class _Player
+    {
+        public List<PlayerAttribute> Attributes = new List<PlayerAttribute>();
+
+        // Attribute trackers
+        public string LastChanged = "Strength";
+        public bool LastChangedWasIncreased = false;
+
+        public _Player()
+        {
+            Attributes.Add(new PlayerAttribute("Agility"));
+            Attributes.Add(new PlayerAttribute("Armour"));
+            Attributes.Add(new PlayerAttribute("Thoughness"));
+            Attributes.Add(new PlayerAttribute("Strength"));
+        }
+
+        public PlayerAttribute GetAttribute(string name)
+        {
+            foreach (var item in Attributes)
+            {
+                if (item.Name == name)
+                    return item;
+            }
+
+            // This should never be reached
+            return null;
+        }
+
+        public int PointsProgress { get; set; } = 13;
+
+        int CalculatePoints(decimal percentage)
+        {
+
+            if (percentage < 0 || percentage > 100)
+                return 0;
+
+            return Convert.ToInt32((percentage * (PointsProgress)) / 100) + StartingAttributePoints;
+        }
+
+        public void CalculateAttributePoints()
+        {
+            foreach (var item in Attributes)
+                item.ValueLabel = CalculatePoints(item.Pct);
+        }
+
+        /// <summary>
+        /// Gets the pct amount from all the attributes
+        /// </summary>
+        /// <param name="items"></param>
+        /// <returns></returns>
+        public int GetAttributesPctTotal()
+        {
+            int total = 0;
+
+            foreach (var item in Attributes)
+                total += item.Pct;
+
+            return total;
+        }
+    }
+
+    _Player Player = new _Player();
+
+    void NumericUpDownChanged(dynamic value, string name)
+    {
+        Player.LastChanged = name;
+
+        int oldValue = Player.GetAttribute(name).Pct;
+
+        // Update Decrement/Increment tracker
+        if (oldValue > value)
+            Player.LastChangedWasIncreased = false;
+        else if (oldValue < value)
+            Player.LastChangedWasIncreased = true;
+
+        Player.GetAttribute(name).Pct = value;
+
+        // Calculate how many points should be where
+        CalculateLabelPoints();
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    ///  Aid method used below, this either returns the Max or Min value from the list of Player Attributes
+    ///  Note: Currently unused
+    /// </summary>
+    /// <param name="min">Ascending or Descending</param>
+    /// <param name="ignore">Ignored Attribute</param>
+    /// <returns></returns>
+    PlayerAttribute MinMaxValueEntry(bool min, string ignoredAttribute)
+    {
+        var itemsList = Player.Attributes.ToList();
+        itemsList.Remove(Player.GetAttribute(ignoredAttribute));
+
+        var orderedItems = itemsList.OrderByDescending(x => x.Pct);
+
+        if (!min)
+            return orderedItems.First();
+        else
+            return orderedItems.Last();
+    }
+
+    void AutoAdjustButton()
+    {
+        decimal total = 0;
+
+        do
+        {
+            var highestValueEntry = MinMaxValueEntry(false, Player.LastChanged);
+            var lowestValueEntry = MinMaxValueEntry(true, Player.LastChanged);
+
+            // Quick and dirty
+            while (highestValueEntry == lowestValueEntry)
+                lowestValueEntry = Player.Attributes[0];
+
+            // Decrement
+            if (!Player.LastChangedWasIncreased)
+            {
+                if (lowestValueEntry.Pct < 100)
+                    lowestValueEntry.Pct += 1;
+                else
+                    lowestValueEntry.Pct = 0;
+            }
+            // Increment
+            else
+            {
+                if (highestValueEntry.Pct > 0)
+                    highestValueEntry.Pct -= 1;
+                else
+                    highestValueEntry.Pct = 100;
+            }
+
+            total = Player.GetAttributesPctTotal();
+
+        } while (total != 100);
+
+        ShowAutoAdjustButton = false;
+        RestoreInfoLabel();
+
+        CalculateLabelPoints();
+    }
+
+
+    string InfoLabel = "";
+
+    const int StartingAttributePoints = 17;
+    const int PointsProgressMin = 13;
+    const int PointsProgressMax = 72;
+
+    protected override void OnInitialized()
+    {
+        RestoreInfoLabel();
+        Player.CalculateAttributePoints();
+    }
+
+    private void RestoreInfoLabel()
+    {
+        InfoLabelBackground = "green";
+        InfoLabel = "Tip: Use your mouse wheel to change the values!";
+    }
+
+    /// <summary>
+    /// Sets all the points label color
+    /// </summary>
+    /// <param name="color"></param>
+    void SetPointsLabelColor(string color)
+    {
+        NumericUpDownColor = color;
+    }
+
+    void PointsProgressChanged(dynamic value)
+    {
+        Player.PointsProgress = value;
+        CalculateLabelPoints();
+    }
+
+
+    void CalculateLabelPoints()
+    {
+        // Before calculating anything we ensure the total is exactly 100
+        if (Player.GetAttributesPctTotal() != 100)
+        {
+            InfoLabel = "Please make sure the total is 100%";
+            InfoLabelBackground = "red";
+            ShowAutoAdjustButton = true;
+            SetPointsLabelColor("grey");
+            return;
+        }
+
+        ShowAutoAdjustButton = false;
+        RestoreInfoLabel();
+
+        Player.CalculateAttributePoints();
+
+        SetPointsLabelColor("green");
+
+    }
+
+}
